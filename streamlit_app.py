@@ -10,6 +10,7 @@ from xgboost import XGBClassifier
 from sklearn.preprocessing import LabelEncoder
 import plotly.express as px
 import plotly.graph_objects as go
+import io
 
 # Set page configuration for a wide layout and attractive theme
 st.set_page_config(page_title="Air Quality Prediction", layout="wide", page_icon="🌬️")
@@ -44,7 +45,7 @@ st.markdown("""
 # Set random seed for reproducibility
 np.random.seed(42)
 
-# Sidebar for navigation and file upload
+# Sidebar for navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Home", "Data Overview", "EDA", "Model Results", "Predict"])
 
@@ -61,36 +62,36 @@ if 'data' not in st.session_state:
     st.session_state.y_pred_xgb = None
     st.session_state.features = None
 
-# File uploader in sidebar
-st.sidebar.subheader("Upload Dataset")
-uploaded_file = st.sidebar.file_uploader("Upload AirQualityUCI.csv", type=["csv"])
-
-# Load and preprocess data when file is uploaded
-if uploaded_file is not None and st.session_state.data is None:
-    data = pd.read_csv(uploaded_file, sep=';', decimal=',')
-    # Data Cleaning
-    data = data.iloc[:, :-2]
-    data.replace(-200, np.nan, inplace=True)
-    data = data.dropna()
-    data['Datetime'] = pd.to_datetime(data['Date'] + ' ' + data['Time'], format='%d/%m/%Y %H.%M.%S')
-    
-    # Create Target Variable
-    def categorize_quality(value):
-        if value < 1000:
-            return 'Low'
-        elif value < 1500:
-            return 'Medium'
-        else:
-            return 'High'
-    data['Quality_level'] = data['PT08.S1(CO)'].apply(categorize_quality)
-    
-    # Feature Engineering
-    data['Hour'] = data['Datetime'].dt.hour
-    data['Pollutant_Ratio'] = data['CO(GT)'] / data['NO2(GT)'].replace(0, np.nan)
-    
-    # Store processed data
-    st.session_state.data = data
-    st.sidebar.success("Dataset loaded successfully!")
+# Load and preprocess dataset from repository
+if st.session_state.data is None:
+    try:
+        data = pd.read_csv('AirQualityUCI.csv', sep=';', decimal=',')
+        # Data Cleaning
+        data = data.iloc[:, :-2]
+        data.replace(-200, np.nan, inplace=True)
+        data = data.dropna()
+        data['Datetime'] = pd.to_datetime(data['Date'] + ' ' + data['Time'], format='%d/%m/%Y %H.%M.%S')
+        
+        # Create Target Variable
+        def categorize_quality(value):
+            if value < 1000:
+                return 'Low'
+            elif value < 1500:
+                return 'Medium'
+            else:
+                return 'High'
+        data['Quality_level'] = data['PT08.S1(CO)'].apply(categorize_quality)
+        
+        # Feature Engineering
+        data['Hour'] = data['Datetime'].dt.hour
+        data['Pollutant_Ratio'] = data['CO(GT)'] / data['NO2(GT)'].replace(0, np.nan)
+        
+        # Store processed data
+        st.session_state.data = data
+        st.sidebar.success("Dataset loaded successfully!")
+    except FileNotFoundError:
+        st.error("Error: 'AirQualityUCI.csv' not found in the repository. Please ensure the file is included in the same directory as streamlit_app.py.")
+        st.stop()
 
 # Home Page
 if page == "Home":
@@ -107,9 +108,8 @@ if page == "Home":
         - 📈 Detailed statistical outputs
         
         **Instructions:**
-        1. Upload the `AirQualityUCI.csv` dataset in the sidebar.
-        2. Use the navigation menu to explore different sections.
-        3. Check the 'Predict' page to input custom values and get air quality predictions.
+        1. Use the navigation menu to explore different sections.
+        2. Check the 'Predict' page to input custom values and get air quality predictions.
     """)
     st.image("https://via.placeholder.com/800x200.png?text=Air+Quality+Banner", use_column_width=True)
 
@@ -128,7 +128,7 @@ elif page == "Data Overview":
         st.subheader("Summary Statistics")
         st.dataframe(st.session_state.data.describe())
     else:
-        st.warning("Please upload the dataset in the sidebar to view the data overview.")
+        st.error("Dataset could not be loaded. Please check the error message in the sidebar.")
 
 # EDA Page
 elif page == "EDA":
@@ -154,7 +154,7 @@ elif page == "EDA":
         fig.update_layout(title="Correlation Heatmap of Numeric Features", width=len(numeric_cols)*50 + 100)
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("Please upload the dataset in the sidebar to view EDA.")
+        st.error("Dataset could not be loaded. Please check the error message in the sidebar.")
 
 # Model Results Page
 elif page == "Model Results":
@@ -235,7 +235,7 @@ elif page == "Model Results":
         fig.update_layout(yaxis_range=[0, 1])
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("Please upload the dataset in the sidebar to view model results.")
+        st.error("Dataset could not be loaded. Please check the error message in the sidebar.")
 
 # Predict Page
 elif page == "Predict":
@@ -295,4 +295,4 @@ elif page == "Predict":
             fig.update_traces(texttemplate='%{y:.2f}', textposition='auto')
             st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("Please upload the dataset and ensure models are trained (visit Model Results page) to make predictions.")
+        st.error("Dataset could not be loaded or models are not trained. Please check the error message in the sidebar.")
